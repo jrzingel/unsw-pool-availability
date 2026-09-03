@@ -1,0 +1,14 @@
+# secrets
+poolstatus.env
+
+# accumulated observations and cron output
+data/
+cron.log
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+
+# editor
+.idea/

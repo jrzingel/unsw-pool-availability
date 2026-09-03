@@ -1,0 +1,223 @@
+# Who books the lanes.
+#
+# The occupancy API only ever says "N of 8 lanes free" -- it never names the
+# booking.  These rules attach names to recurring blocks, and are meant to be
+# edited by hand as you work out who is actually in the water.
+#
+# Each rule matches a half-hour block and claims some lanes in it:
+#
+#   ends       "deep" and/or "shallow"           (the two 25m halves)
+#   days       Mon Tue Wed Thu Fri Sat Sun       (omit for every day)
+#   time       "HH:MM-HH:MM", 24h, end exclusive
+#   lanes      how many lanes this booking typically takes
+#   confidence confirmed | likely | guess        (confirmed = published somewhere)
+#   frequency  weekly | most-weeks | some-weeks
+#
+# Anything booked that no rule claims is reported as "unattributed" -- run
+# `poolstatus patterns` to see what is still unnamed.
+#
+# Baseline measured over 2026-09-05 .. 2026-10-01 (4 weeks, school term).
+# Re-check after each term break; the afternoon and evening blocks move.
+
+# ---------------------------------------------------------------------------
+# Swim squads -- timetable published at unswfac.com.au/aquatics/swim-squads/
+# ---------------------------------------------------------------------------
+
+[[rule]]
+who = "Swim squads (morning)"
+detail = "Gold + Platinum + Adult squad 5:30am, Bronze + Silver 6:15am"
+ends = ["deep"]
+days = ["Mon", "Wed", "Fri"]
+time = "06:00-07:30"
+lanes = 8
+confidence = "confirmed"
+frequency = "weekly"
+source = "https://unswfac.com.au/aquatics/swim-squads/"
+
+[[rule]]
+who = "Swim squads (Saturday)"
+detail = "Bronze, Silver, Gold and Platinum all start 7:00am"
+ends = ["deep"]
+days = ["Sat"]
+time = "07:00-09:00"
+lanes = 8
+confidence = "confirmed"
+frequency = "weekly"
+source = "https://unswfac.com.au/aquatics/swim-squads/"
+
+[[rule]]
+who = "Swim squads (afternoon)"
+detail = "Pre/Bronze/Platinum 3:45pm, Silver/Gold 4:30pm, Teen Fitness 4:45pm; Gold runs 105min and Platinum 120-135min"
+ends = ["deep"]
+days = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+time = "15:30-18:30"
+lanes = 6
+confidence = "confirmed"
+frequency = "weekly"
+source = "https://unswfac.com.au/aquatics/swim-squads/"
+
+# ---------------------------------------------------------------------------
+# Group fitness -- Aqua is the only pool class on the gym timetable
+# ---------------------------------------------------------------------------
+
+[[rule]]
+who = "Aqua class"
+detail = "45min aqua fitness class, 10:45am, held in the shallow end"
+ends = ["shallow"]
+days = ["Tue", "Thu", "Fri"]
+time = "10:30-11:30"
+lanes = 3
+confidence = "confirmed"
+frequency = "most-weeks"
+source = "unswfac.com.au Group Fitness Timetable (PDF)"
+
+# ---------------------------------------------------------------------------
+# Learn to Swim -- not published as a timetable, but the shape is unmistakable:
+# a steady 3-4 lanes of the shallow end every weekday after school and all
+# weekend morning, which is when kids' lessons run.
+# ---------------------------------------------------------------------------
+
+[[rule]]
+who = "Learn to Swim (after school)"
+ends = ["shallow"]
+days = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+time = "15:30-19:00"
+lanes = 4
+confidence = "likely"
+frequency = "weekly"
+
+[[rule]]
+who = "Learn to Swim (weekend)"
+ends = ["shallow"]
+days = ["Sat", "Sun"]
+time = "08:30-12:00"
+lanes = 4
+confidence = "likely"
+frequency = "weekly"
+
+[[rule]]
+who = "Learn to Swim (weekend afternoon)"
+ends = ["shallow"]
+days = ["Sat"]
+time = "13:00-16:00"
+lanes = 4
+confidence = "likely"
+frequency = "most-weeks"
+
+[[rule]]
+who = "Learn to Swim (deep end lesson)"
+detail = "One or two lanes only -- deep-water/stroke correction classes"
+ends = ["deep"]
+days = ["Sat"]
+time = "09:00-12:00"
+lanes = 2
+confidence = "guess"
+frequency = "weekly"
+
+# ---------------------------------------------------------------------------
+# Schools -- the deep end goes to zero in bands that do not line up with any
+# published class, and moves around week to week.  Your water polo hypothesis.
+# ---------------------------------------------------------------------------
+
+[[rule]]
+who = "School booking (morning)"
+detail = "Friday deep end stays fully booked past squad until 9am; absent some weeks"
+ends = ["deep"]
+days = ["Fri"]
+time = "07:30-09:00"
+lanes = 8
+confidence = "likely"
+frequency = "most-weeks"
+
+[[rule]]
+who = "School booking (midday)"
+detail = "Whole deep end disappears for an hour, roughly every second week"
+ends = ["deep"]
+days = ["Mon", "Tue", "Wed"]
+time = "14:00-15:00"
+lanes = 8
+confidence = "guess"
+frequency = "some-weeks"
+
+[[rule]]
+who = "School squad (early)"
+detail = "Two lanes after the morning squads clear out"
+ends = ["deep"]
+days = ["Mon", "Wed"]
+time = "07:30-08:30"
+lanes = 2
+confidence = "guess"
+frequency = "weekly"
+
+# ---------------------------------------------------------------------------
+# Evening clubs -- the deep end is booked solid every weekday evening.  Deep
+# water plus long blocks plus full-width bookings says water polo to me, but
+# this is the biggest unknown and the one most worth confirming at reception.
+# ---------------------------------------------------------------------------
+
+[[rule]]
+who = "Evening club hire (water polo?)"
+detail = "Deep end fully booked; ends 8pm Wed/Fri, 9pm Mon/Tue, 9pm Thu"
+ends = ["deep"]
+days = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+time = "18:30-21:00"
+lanes = 8
+confidence = "guess"
+frequency = "weekly"
+
+# ---------------------------------------------------------------------------
+# Shallow end mornings -- small, consistent, and unexplained.
+# ---------------------------------------------------------------------------
+
+[[rule]]
+who = "Morning lane hire (shallow)"
+detail = "5 lanes at 6:00am dropping to 2 by 6:30am, Mon/Wed/Fri; likely masters or a squad overflow"
+ends = ["shallow"]
+days = ["Mon", "Wed", "Fri"]
+time = "06:00-07:30"
+lanes = 3
+confidence = "guess"
+frequency = "weekly"
+
+[[rule]]
+who = "Morning lane hire (shallow)"
+ends = ["shallow"]
+days = ["Tue", "Thu"]
+time = "06:00-07:30"
+lanes = 2
+confidence = "guess"
+frequency = "most-weeks"
+
+# ---------------------------------------------------------------------------
+# Midday
+# ---------------------------------------------------------------------------
+
+[[rule]]
+who = "Midday booking"
+detail = "Small standing booking, shallow end"
+ends = ["shallow"]
+days = ["Mon"]
+time = "11:30-12:30"
+lanes = 3
+confidence = "guess"
+frequency = "most-weeks"
+
+[[rule]]
+who = "Midday booking"
+detail = "Two lanes of the deep end over lunch"
+ends = ["deep"]
+days = ["Thu"]
+time = "12:30-14:30"
+lanes = 2
+confidence = "guess"
+frequency = "most-weeks"
+
+[[rule]]
+who = "Evening lane hire (shallow)"
+detail = "Three lanes after Learn to Swim finishes"
+ends = ["shallow"]
+days = ["Wed", "Thu"]
+time = "19:00-20:30"
+lanes = 3
+confidence = "guess"
+frequency = "most-weeks"

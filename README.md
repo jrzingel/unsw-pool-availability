@@ -4,12 +4,16 @@ Lane availability for the UNSW Fitness & Aquatic Centre pool, so you know before
 you walk down there.
 
 ```
+uv run poolstatus week           # the week ahead, and when to go -- this is the email
+uv run poolstatus week --html    # same thing as an HTML email body
 uv run poolstatus today          # what is free for the rest of today, and who has the rest
-uv run poolstatus today --html   # same thing as an HTML email body
-uv run poolstatus week           # 7-day grid, both ends
+uv run poolstatus prefs          # the swim preferences currently in force
 uv run poolstatus snapshot       # append today's picture to the local history
 uv run poolstatus patterns       # recurring bookings, and which ones are still unnamed
 ```
+
+Every date and time is the pool's, in `Australia/Sydney`, whatever clock the
+machine running it happens to be set to.
 
 ## Where the numbers come from
 
@@ -27,7 +31,7 @@ end — the two halves of the split 50m pool, eight lanes each. Each response is
 grid of half-hour blocks with `totalCountOfOccupancyAvailability` (lanes free)
 out of `numberOfFacilities` (8).
 
-Three things worth knowing about it:
+Four things worth knowing about it:
 
 - **No history.** Any `startDate` in the past is silently clamped to today, so
   yesterday is gone the moment it passes. `poolstatus snapshot` exists to build
@@ -37,6 +41,10 @@ Three things worth knowing about it:
   early-morning and late-evening blocks. Asking for a week or more always
   returns the full 6:00am–9:30pm grid; the client always asks for at least
   seven days and trims afterwards.
+- **`startDate` is snapped back to Monday.** The page always begins at the
+  start of the week the date falls in and runs `daysPerPage` days from there,
+  so seven days asked for from a Wednesday come back two days short. The client
+  pays for the days at the front of the week and trims them off.
 - **Closed looks exactly like booked out.** Both report zero lanes free. The
   centre's hours (Mon–Fri 6am–10pm, Sat/Sun 7am–7pm, pool closes 15 min earlier)
   live in `hours.py`, which is what stops the weekend 6–7am and 7–9:30pm bands
@@ -97,9 +105,45 @@ Rules seeded from what is published and what the data shows, measured over
   The 2–3pm hole on Mon/Tue/Wed is the intermittent midday block. Thursday
   morning is the one weekday the deep end is yours.
 
+## When to go
+
+The week report opens with one answer — the best swim in the next seven days —
+before the timetable it came from:
+
+```
+BEST SWIM     Thursday 17 September, 8am-9am, 25M Deep End - 8 lanes free
+           or Friday 18 September, 8am-9am, 25M Deep End - 8 lanes free
+           or Tuesday 15 September, 8am-9am, 25M Shallow End - 8 lanes free
+```
+
+A candidate is a run of blocks inside your window, long enough for a swim, open,
+and with enough lanes free the whole way through. They rank on the lanes you are
+*guaranteed* (a window that dips to two lanes is a two-lane window), then on how
+much of it lands in the hour you actually want, then on which half of the pool.
+One per day, so the runners-up are alternatives rather than the same morning
+sliced five ways. If nothing clears the bar all week it says so, and still names
+the closest thing.
+
+What counts as good is yours, in `poolstatus/preferences.toml` — the second
+hand-edited file, alongside `rules.toml`:
+
+```toml
+timezone = "Australia/Sydney"
+window = "8:00-10:00"       # when you would swim
+ideal  = "8:00-9:00"        # when you would rather
+session_minutes = 60
+min_lanes = 3               # fewer than this is not worth the walk
+prefer_end = "deep"         # which half wins a tie
+days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+```
+
+`uv run poolstatus prefs` prints what is in force, and the local time it
+resolves to. `--window 6:00-9:00` and `--min-lanes 4` override the file for one
+run without editing it.
+
 ## Emailing it
 
-`send_report.sh` builds the report and posts it to Mailgun. One-time setup:
+`send_report.sh` builds the week report and posts it to Mailgun. One-time setup:
 
 ```sh
 cp poolstatus.env.example poolstatus.env
@@ -108,57 +152,86 @@ $EDITOR poolstatus.env        # MAILGUN_API_KEY, MAILGUN_DOMAIN, MAIL_FROM, MAIL
 ./send_report.sh              # check it arrives
 ```
 
-Then in `crontab -e`:
+One email a week, Sunday evening, covering Monday to Sunday. Then in
+`crontab -e`:
 
 ```
-30 6 * * * /home/james/projects/poolstatus/send_report.sh >> /home/james/projects/poolstatus/cron.log 2>&1
+TZ=Australia/Sydney
+30 18 * * 0 /home/james/projects/poolstatus/send_report.sh >> /home/james/projects/poolstatus/cron.log 2>&1
+15  6 * * * /home/james/projects/poolstatus/.venv/bin/poolstatus snapshot >> /home/james/projects/poolstatus/cron.log 2>&1
 ```
+
+**The server is on UTC and the pool is not.** Two separate things have to be
+fixed for that, and only one of them is cron's:
+
+- *What the report says.* Handled — the report is rendered in the timezone from
+  `preferences.toml` no matter what the host clock says, and `send_report.sh`
+  asks the package for that zone and sets its own `TZ` from it, so the log
+  stamps and the subject line agree with the body.
+- *When cron fires.* Not something the script can fix from the inside. The
+  `TZ=Australia/Sydney` line above works on Debian/Ubuntu cron and cronie, and
+  it handles daylight saving. If yours ignores it, wake the script hourly and
+  let it pick its own moment instead:
+
+  ```
+  17 * * * * SEND_AT="Sun 18" /home/james/projects/poolstatus/send_report.sh >> .../cron.log 2>&1
+  ```
+
+  `SEND_AT` is a local weekday and hour; any other hour the script exits
+  quietly, before it touches the network.
+
+The second cron line keeps the history dense. The weekly email takes a snapshot
+too, but once a week is a thin record to mine for patterns, and a snapshot only
+appends when the picture actually changed.
 
 `poolstatus.env` and `cron.log` are gitignored, along with `data/`.
 
-The email covers the rest of the day from the time it is sent, so a 6:30am cron
-gives you the whole day. Set `POOLSTATUS_ARGS` in the env file to change that —
-`--all-day` to always show the full day, `--min-lanes 4` to raise the bar for
-what counts as worth turning up for.
-
-Each run also does a `poolstatus snapshot`, so the history builds up on its own.
-That failing does not stop the email.
+Set `POOLSTATUS_ARGS` in the env file to change what is sent — it defaults to
+`--from tomorrow` (Sunday evening, so the week starts Monday). `--from today`
+to include the rest of today, `--days 14` for a fortnight, `--min-lanes 4` to
+raise the bar, `--window 6:00-9:00` for one-off early starts.
 
 A few details, since this runs unattended:
 
 - The API key is passed to curl through a config file, never on the command
   line, so it does not show up in `ps`.
-- Building the report retries three times with a backoff — one 6am network
-  hiccup should not cost the day's email.
+- Building the report retries three times with a backoff — one network hiccup
+  should not cost the week's email.
+- The subject line is lifted from the report itself (`UNSW pool lanes · Mon 15
+  Sep to Sun 21 Sep`), so it cannot drift from what is in the body.
 - It works under cron's stripped environment (no `PATH`, no locale); it calls
   `.venv/bin/poolstatus` by absolute path rather than going through `uv`.
 
 To send from your own code instead:
 
 ```python
-import datetime as dt
-from poolstatus import client
-from poolstatus.report import render_html, render_text
+from poolstatus import client, config
+from poolstatus.report import render_week_html, render_week_text
 
-snapshot = client.fetch(days=1)
-html = render_html(snapshot, now=dt.datetime.now().time())
-text = render_text(snapshot, now=dt.datetime.now().time())
+snapshot = client.fetch(start_date=config.today(), days=7)
+html = render_week_html(snapshot.days, now=config.now())
+text = render_week_text(snapshot.days, now=config.now())
 ```
 
-Pass `now=None` for the whole day rather than just what is left of it.
+Pass `now=None` to keep today's elapsed blocks, and `prefs=` to override
+`preferences.toml`. The single-day `render_html` / `render_text` still take a
+`Snapshot` and a `date`.
 
 ## Layout
 
 | File | What it does |
 |---|---|
-| `client.py` | the JSON API, and the two quirks above |
+| `client.py` | the JSON API, and the quirks above |
 | `model.py` | `Slot` / `PoolDay` / `Snapshot` |
 | `hours.py` | opening hours, so closed ≠ booked out |
 | `rules.toml` | **who books what — edit this** |
+| `preferences.toml` | **when you like to swim — edit this** |
+| `config.py` | reads the preferences; the pool's clock, not the host's |
 | `classify.py` | matches blocks against the rules |
+| `recommend.py` | ranks the week's windows and picks one |
 | `analyse.py` | finds the recurring weekly shape |
 | `store.py` | appends observations to `data/history.jsonl` |
-| `report.py` | text and HTML rendering |
+| `report.py` | text and HTML, for a day and for the week |
 | `cli.py` | the commands above |
 | `send_report.sh` | builds the report and posts it to Mailgun; for cron |
 | `poolstatus.env.example` | template for the gitignored `poolstatus.env` |

@@ -1,0 +1,22 @@
+# When you like to swim.  Hand-edited, like rules.toml -- the weekly email
+# reads this every time it runs, so a change here shows up in the next one.
+
+# The pool is in Sydney; the machine sending the email may not be.  Every
+# "today" and "now" in a report is resolved in this zone.
+timezone = "Australia/Sydney"
+
+# The stretch of the day you would swim in, and the hour inside it you actually
+# want.  A suggestion landing on `ideal` beats one that merely fits `window`.
+window = "7:30-10:00"
+ideal = "8:00-9:00"
+
+# How long you want in the water, and how many free lanes makes it worth the walk.
+session_minutes = 60
+min_lanes = 3
+
+# "deep", "shallow", or "any" -- which half wins a tie.  The deep end is the
+# contested one, so preferring it means the suggestion is worth acting on.
+prefer_end = "deep"
+
+# Days worth suggesting.  Drop "Sat" and "Sun" if the weekend is out.
+days = ["Mon", "Tue", "Wed", "Thu", "Fri"]

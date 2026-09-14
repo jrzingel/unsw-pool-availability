@@ -17,6 +17,10 @@ Two quirks worth knowing:
   page, so a small `daysPerPage` drops real early-morning and late-evening
   blocks.  Requesting a week or more always returns the full 6:00am-9:30pm grid,
   hence MIN_DAYS_PER_PAGE below.
+* `startDate` is snapped back to the Monday of the week it falls in, and the
+  page runs `daysPerPage` days from *there*.  Asking for seven days from a
+  Wednesday returns Mon-Sun and stops two days short, so the request has to pay
+  for the days at the start of the week it never wanted.
 """
 
 from __future__ import annotations
@@ -25,6 +29,8 @@ import datetime as dt
 
 import requests
 
+from .config import now as local_now
+from .config import today as local_today
 from .model import ENDS, PoolDay, Slot, Snapshot
 
 API_URL = (
@@ -61,14 +67,15 @@ def fetch_end(
     """Fetch `days` days of availability for one half of the pool."""
     if end not in CALENDAR_IDS:
         raise PoolStatusError(f"unknown pool end {end!r}, expected one of {ENDS}")
-    start_date = start_date or dt.date.today()
+    start_date = start_date or local_today()
 
     params = {
         "calendarId": CALENDAR_IDS[end],
         "startDate": start_date.isoformat(),
-        # Ask for at least a week even when the caller wants fewer days, then
-        # trim, so the returned grid is never truncated.
-        "daysPerPage": max(days, MIN_DAYS_PER_PAGE),
+        # Cover the days back to the Monday the page really starts on, and ask
+        # for at least a week even when the caller wants fewer days.  Both are
+        # then trimmed below, so the grid is never truncated and never short.
+        "daysPerPage": max(start_date.weekday() + days, MIN_DAYS_PER_PAGE),
     }
     get = (session or requests).get
     response = get(
@@ -111,7 +118,7 @@ def fetch(
             pool_days += fetch_end(
                 end, start_date=start_date, days=days, session=session, timeout=timeout
             )
-    return Snapshot(fetched_at=dt.datetime.now().astimezone(), days=pool_days)
+    return Snapshot(fetched_at=local_now(), days=pool_days)
 
 
 def _parse_slot(hour: dict) -> Slot:

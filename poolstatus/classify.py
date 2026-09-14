@@ -14,11 +14,10 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from .model import PoolDay, Slot
+from .model import WEEKDAY_NAMES, PoolDay, Slot
 
 RULES_PATH = Path(__file__).with_name("rules.toml")
 
-WEEKDAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 CONFIDENCE_ORDER = {"confirmed": 0, "likely": 1, "guess": 2}
 
 
@@ -64,6 +63,15 @@ class Attribution:
     @property
     def unattributed_lanes(self) -> int:
         return max(0, self.slot.lanes_booked - self.claimed_lanes)
+
+    def named(self) -> str:
+        """Only the bookings a rule accounts for -- no "unattributed" noise.
+
+        The week timetable uses this: over seven days "unattributed" on every
+        other row says nothing and stops bands that mean the same thing from
+        collapsing into one.
+        """
+        return ", ".join(dict.fromkeys(rule.who for rule in self.rules))
 
     def summary(self) -> str:
         """A short human phrase for who has the lanes."""

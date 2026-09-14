@@ -12,9 +12,9 @@ import datetime as dt
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 
-from .classify import WEEKDAY_NAMES, Rule, attribute, load_rules
+from .classify import Rule, attribute, load_rules
 from .hours import is_open
-from .model import PoolDay, Slot, _h
+from .model import WEEKDAY_NAMES, PoolDay, Slot, _h
 from .store import grid_times
 
 

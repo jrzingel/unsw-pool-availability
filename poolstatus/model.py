@@ -13,6 +13,8 @@ ENDS = (END_DEEP, END_SHALLOW)
 
 SLOT_MINUTES = 30
 
+WEEKDAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
 
 @dataclass(frozen=True, slots=True)
 class Slot:

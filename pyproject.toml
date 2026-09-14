@@ -5,6 +5,9 @@ description = "Lane availability for the UNSW Fitness & Aquatic Centre pool"
 requires-python = ">=3.12"
 dependencies = [
     "requests>=2.32",
+    # The report is rendered in the pool's timezone whatever the host is set
+    # to; a stripped-down Linux box may have no system zoneinfo to read.
+    "tzdata>=2024.1",
 ]
 
 [project.scripts]
